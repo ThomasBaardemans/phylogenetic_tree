@@ -1,0 +1,182 @@
+---
+title: "scorpions_phylogenetic_tree"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Sequence allignment of top 5 differentiated genes. 
+
+
+```{r}
+library(tidyverse)
+library(biomaRt)
+```
+
+```{r}
+conserved_genes <- c("HSPA1A")
+```
+
+first we retrieve the human ensemble id's and description etc.
+```{r}
+mart <- useMart(biomart = "ensembl")
+
+availabledatasets <- listDatasets(mart)
+
+
+
+h_sapiens <- useDataset(dataset = "hsapiens_gene_ensembl", 
+                        mart=mart)
+
+filters = listFilters(h_sapiens) %>% 
+  as_tibble() 
+
+attributes <- listAttributes(h_sapiens) %>%
+  as_tibble() 
+
+human_annot <- getBM(attributes = c('external_gene_name',
+                     'ensembl_gene_id',
+                     'chromosome_name',
+                     'description'), 
+      filters = 'external_gene_name',
+      values = conserved_genes,
+      mart = h_sapiens) %>%
+  dplyr::mutate(species = "H.sapiens") %>%
+  dplyr::select(species, external_gene_name:description) %>%
+  as_tibble()
+
+
+human_annot <- human_annot[1,]
+human_annot
+
+```
+
+next we do the same to get the homologs for coelacanths and zebra finches
+```{r}
+coelacanth <- useMart(biomart = "ensembl", 
+                       dataset="lchalumnae_gene_ensembl")
+
+coelacanth_annot <- getBM(attributes = c('external_gene_name',
+                     'ensembl_gene_id',
+                     'chromosome_name',
+                     'description'), 
+      filters = 'external_gene_name',
+      values = conserved_genes,
+      mart = coelacanth) %>% 
+  mutate(species = "L.chalumnae")
+
+coelacanth_annot
+```
+
+```{r}
+zebrafinch <- useMart(biomart = "ensembl", 
+                       dataset="tguttata_gene_ensembl")
+
+zebrafinch_annot <- getBM(attributes = c('external_gene_name',
+                     'ensembl_gene_id',
+                     'chromosome_name',
+                     'description'), 
+      filters = 'external_gene_name',
+      values = top5genes,
+      mart = oran_utan) %>% 
+  mutate(species = "T.guttata")
+```
+
+
+
+
+
+Next we bind them together
+```{r}
+all_data <- dplyr::bind_rows(human_annot, homologs_oran)
+```
+
+
+get human sequence
+```{r}
+human_gene_id <- all_data %>%
+  dplyr::filter(species == "H.sapiens") %>%
+  dplyr::select(ensembl_gene_id) 
+
+human_sequence <- biomaRt::getSequence(id = human_gene_id$ensembl_gene_id, 
+            type="ensembl_gene_id",
+            seqType="coding",
+            mart= h_sapiens) %>%
+  as_tibble() %>%
+  dplyr::filter(coding != "Sequence unavailable") %>%
+  print()
+
+human_sequence <- unique(human_sequence) 
+```
+
+
+get oran utan sequence
+```{r}
+oran_gene_id <- all_data %>%
+  dplyr::filter(species == "P. abelii") %>%
+  dplyr::select(ensembl_gene_id)
+  
+
+oran_sequence <- biomaRt::getSequence(id = oran_gene_id$ensembl_gene_id, 
+            type="ensembl_gene_id",
+            seqType="coding",
+            mart= oran_utan) %>%
+  as_tibble() %>%
+  dplyr::filter(coding != "Sequence unavailable")
+
+oran_sequence <- unique(oran_sequence) 
+```
+
+##binding sequence and gene info together
+```{r}
+all_sequences <- dplyr::bind_rows(human_sequence,
+                                  oran_sequence)
+
+all_data_sequence <- dplyr::left_join(all_sequences, all_data, by = "ensembl_gene_id")
+
+all_data_sequence <- all_data_sequence %>%
+  as_tibble() %>%
+  arrange(external_gene_name)
+```
+
+
+```{r}
+#C15orf48 allignment
+C15orf48  <- filter(all_data_sequence, external_gene_name == "C15orf48")
+FASN  <- filter(all_data_sequence, external_gene_name == "FASN")
+GPX2  <- filter(all_data_sequence, external_gene_name == "GPX2")
+LAMC2 <- filter(all_data_sequence, external_gene_name == "LAMC2")
+STC2 <- filter(all_data_sequence, external_gene_name == "STC2")
+
+C15orf48_aa <- Biostrings::AAStringSet(C15orf48$coding)
+FASN_aa <- Biostrings::AAStringSet(FASN$coding)
+GPX2_aa <- Biostrings::AAStringSet(GPX2$coding)
+LAMC2_aa <- Biostrings::AAStringSet(LAMC2$coding)
+STC2_aa <- Biostrings::AAStringSet(STC2$coding)
+
+
+names(C15orf48_aa) <- paste(C15orf48$species, C15orf48$ensembl_gene_id, sep = "_")
+names(FASN_aa) <- paste(FASN$species, FASN$ensembl_gene_id, sep = "_")
+names(GPX2_aa) <- paste(GPX2$species, GPX2$ensembl_gene_id, sep = "_")
+names(LAMC2_aa) <- paste(LAMC2$species, LAMC2$ensembl_gene_id, sep = "_")
+names(STC2_aa) <- paste(STC2$species, STC2$ensembl_gene_id, sep = "_")
+```
+
+```{r}
+library(msa)
+C15orf48_align <- msa::msa(C15orf48_aa)
+C15orf48_align 
+
+FASN_align <- msa::msa(FASN_aa)
+FASN_align 
+
+GPX2_align <- msa::msa(GPX2_aa)
+GPX2_align 
+
+LAMC2_align <- msa::msa(LAMC2_aa)
+LAMC2_align 
+
+STC2_align <- msa::msa(STC2_aa)
+STC2_align 
+```

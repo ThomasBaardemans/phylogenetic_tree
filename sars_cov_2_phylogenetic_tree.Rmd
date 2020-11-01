@@ -1,0 +1,70 @@
+---
+title: "scorpions_phylogenetic_tree"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+install.packages("adegenet")
+install.packages("bios2mds")
+```
+
+```{r}
+library(tidyverse)
+library(msa)
+library(here)
+library(Biostrings)
+library(adegenet)
+library(bios2mds)
+library(ape)
+```
+
+```{r}
+cov2_seq <- readDNAStringSet(here::here("data", "sars_cov_2_dutch_sequences.fasta"))
+cov2_seq_sel <- readDNAStringSet(here::here("data", "sars_cov_2_selected_dutch_sequences.fasta"))
+cov2_seq_four <- readDNAStringSet(here::here("data", "sars_cov_2_four_dutch_sequences.fasta"))
+```
+
+```{r}
+#warning: aligning 600 genomes takes quite some time.
+#cov2_seq_aligned <- msa::msa(cov2_seq)
+#cov2_seq_sel_aligned <- msa::msa(cov2_seq_sel)
+cov2_seq_four_aligned <- msa::msa(cov2_seq_four)
+```
+
+
+```{r}
+cov2_seq_four_aligned_converted <- msaConvert(cov2_seq_four_aligned, type = "bios2mds::align")
+```
+
+
+```{r}
+export.fasta(cov2_seq_four_aligned_converted, outfile = "test_alignment.fa", open = "w")
+```
+
+```{r}
+cov2_bin_aligned <- fasta2DNAbin(here::here("test_alignment.fa"))
+```
+
+
+```{r}
+distance_phylogeny <- dist.dna(cov2_bin_aligned, model="TN93")
+```
+
+```{r}
+tree <- nj(distance_phylogeny)
+
+tree <- ladderize(tree)
+```
+
+```{r}
+plot(tree)
+```
+
